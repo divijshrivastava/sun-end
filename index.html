@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The End of the Solar System</title>
+    <title>HeliosFate</title>
     <style>
         body {
             background-color: black;
@@ -14,14 +14,56 @@
             margin: 0;
             color: white;
             font-family: Arial, sans-serif;
+            overflow: hidden;
         }
         canvas {
             border: 1px solid #333;
+        }
+        #credits {
+            position: absolute;
+            top: 100%;
+            width: 100%;
+            text-align: center;
+            font-size: 24px;
+            font-family: 'Courier New', monospace;
+            color: #ffd700; /* Gold color for Star Wars feel */
+            text-shadow: 0 0 10px #ffd700, 0 0 20px #ff4500;
+            transform: perspective(300px) rotateX(30deg);
+            white-space: nowrap;
+            z-index: 10;
+        }
+        .hidden {
+            display: none;
         }
     </style>
 </head>
 <body>
     <canvas id="canvas" width="800" height="800"></canvas>
+    <div id="credits" class="hidden">
+        <p> </p>
+        <p> </p>
+        <p> </p>
+        <p> </p>
+        <p> </p>
+        <p> </p>
+        <p> </p>
+        <p>Directed By</p>
+        <p> </p>
+        <p>Divij</p>
+        <p> </p>
+        <p> </p>
+        <p> </p>
+        <p> </p>
+        <p> </p>
+        <p> </p>
+        <p> </p>
+        <p> </p>
+        <p> </p>
+        <p> </p>
+        <p> </p>
+        <p> </p>
+        <p> </p>
+    </div>
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -58,6 +100,7 @@
 
         let startTime = null;
         let lastTime = null;
+        let creditsStartTime = null;
 
         function drawStars() {
             ctx.fillStyle = 'white';
@@ -88,13 +131,16 @@
             const dt = (timestamp - lastTime) / 1000;
             const t = (timestamp - startTime) / 1000;
 
-            if (t > T_TOTAL) return;
+            if (t > T_TOTAL && !creditsStartTime) {
+                document.getElementById('credits').classList.remove('hidden');
+                creditsStartTime = timestamp;
+            }
 
             ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
             drawStars();
 
-            const phase = t / T_TOTAL;
+            const phase = Math.min(t / T_TOTAL, 1);
             let sunRadius = SUN_INITIAL_RADIUS;
             let sunColor = '#FFFF00'; // Yellow
 
@@ -128,37 +174,71 @@
             ctx.stroke();
             ctx.shadowBlur = 0;
 
-            // Draw planets
-            planets.forEach(planet => {
-                planet.angle += planet.speed * dt * 20; // Speed up for visibility
+            // Update and draw planets only during main animation
+            if (t <= T_TOTAL) {
+                planets.forEach(planet => {
+                    planet.angle += planet.speed * dt * 20; // Speed up for visibility
 
-                const distPixels = planet.au * AU_SCALE;
-                if (planet.engulfed || distPixels < sunRadius) {
-                    if (!planet.engulfed && distPixels < sunRadius) {
-                        planet.engulfed = true;
+                    const distPixels = planet.au * AU_SCALE;
+                    if (planet.engulfed || distPixels < sunRadius) {
+                        if (!planet.engulfed && distPixels < sunRadius) {
+                            planet.engulfed = true;
+                        }
+                        return; // Don't draw if engulfed or would be engulfed now
                     }
-                    return; // Don't draw if engulfed or would be engulfed now
-                }
 
-                const x = CENTER_X + distPixels * Math.cos(planet.angle);
-                const y = CENTER_Y + distPixels * Math.sin(planet.angle);
+                    const x = CENTER_X + distPixels * Math.cos(planet.angle);
+                    const y = CENTER_Y + distPixels * Math.sin(planet.angle);
 
-                ctx.beginPath();
-                ctx.arc(x, y, planet.size, 0, 2 * Math.PI);
-                ctx.fillStyle = planet.color;
-                ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(x, y, planet.size, 0, 2 * Math.PI);
+                    ctx.fillStyle = planet.color;
+                    ctx.fill();
 
-                // Label
+                    // Label
+                    ctx.fillStyle = 'white';
+                    ctx.font = '10px Arial';
+                    ctx.fillText(planet.name, x + planet.size + 2, y);
+                });
+            } else {
+                // After 30s, draw remaining planets without updating angles
+                planets.forEach(planet => {
+                    if (planet.engulfed) return;
+
+                    const distPixels = planet.au * AU_SCALE;
+                    const x = CENTER_X + distPixels * Math.cos(planet.angle);
+                    const y = CENTER_Y + distPixels * Math.sin(planet.angle);
+
+                    ctx.beginPath();
+                    ctx.arc(x, y, planet.size, 0, 2 * Math.PI);
+                    ctx.fillStyle = planet.color;
+                    ctx.fill();
+
+                    // Label
+                    ctx.fillStyle = 'white';
+                    ctx.font = '10px Arial';
+                    ctx.fillText(planet.name, x + planet.size + 2, y);
+                });
+            }
+
+            // Draw stage text only during main animation
+            if (t <= T_TOTAL) {
                 ctx.fillStyle = 'white';
-                ctx.font = '10px Arial';
-                ctx.fillText(planet.name, x + planet.size + 2, y);
-            });
+                ctx.font = '20px Arial';
+                ctx.fillText(stageText, 10, 30);
+                ctx.fillText(`Time: ${t.toFixed(1)}s / 30s`, 10, 60);
+            }
 
-            // Draw stage text
-            ctx.fillStyle = 'white';
-            ctx.font = '20px Arial';
-            ctx.fillText(stageText, 10, 30);
-            ctx.fillText(`Time: ${t.toFixed(1)}s / 30s`, 10, 60);
+            // Handle credits scroll
+            if (creditsStartTime) {
+                const creditsTime = (timestamp - creditsStartTime) / 1000;
+                const credits = document.getElementById('credits');
+                credits.style.top = `${100 - (creditsTime / 60) * 200}%`; // Adjusted scroll speed for longer scroll
+                if (creditsTime > 60) {
+                    credits.style.display = 'none';
+                    return; // Stop the animation after credits
+                }
+            }
 
             lastTime = timestamp;
             requestAnimationFrame(animate);
