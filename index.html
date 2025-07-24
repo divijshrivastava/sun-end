@@ -1,111 +1,165 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gravitational Waves</title>
-  <style>
-    body {
-      margin: 0;
-      background: black;
-      overflow: hidden;
-    }
-    canvas {
-      display: block;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The End of the Solar System</title>
+    <style>
+        body {
+            background-color: black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            border: 1px solid #333;
+        }
+    </style>
 </head>
 <body>
-  <canvas id="gwCanvas"></canvas>
-  <script>
-    const canvas = document.getElementById("gwCanvas");
-    const ctx = canvas.getContext("2d");
-    let width, height;
+    <canvas id="canvas" width="800" height="800"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const WIDTH = 800;
+        const HEIGHT = 800;
+        const CENTER_X = WIDTH / 2;
+        const CENTER_Y = HEIGHT / 2;
+        const AU_SCALE = 100; // Pixels per AU, increased to make engulfment visible
+        const T_TOTAL = 30; // Total animation time in seconds
+        const SUN_INITIAL_RADIUS = 5; // Exaggerated for visibility
+        const SUN_MAX_RADIUS = 150; // Adjusted to engulf up to Mars (~1.5 AU)
+        const SUN_WD_RADIUS = 2; // White dwarf, small
 
-    function resize() {
-      width = canvas.width = window.innerWidth;
-      height = canvas.height = window.innerHeight;
-    }
-    window.addEventListener("resize", resize);
-    resize();
+        const planets = [
+            { name: 'Mercury', au: 0.4, color: 'gray', size: 2, angle: 0, speed: 0.1 / 0.4 },
+            { name: 'Venus', au: 0.7, color: 'orange', size: 3, angle: 0, speed: 0.1 / 0.7 },
+            { name: 'Earth', au: 1, color: 'blue', size: 4, angle: 0, speed: 0.1 / 1 },
+            { name: 'Mars', au: 1.5, color: 'red', size: 3, angle: 0, speed: 0.1 / 1.5 },
+            { name: 'Jupiter', au: 5, color: 'brown', size: 10, angle: 0, speed: 0.1 / 5 },
+            { name: 'Saturn', au: 9.5, color: 'yellow', size: 9, angle: 0, speed: 0.1 / 9.5 },
+            { name: 'Uranus', au: 19, color: 'lightblue', size: 7, angle: 0, speed: 0.1 / 19 },
+            { name: 'Neptune', au: 30, color: 'darkblue', size: 7, angle: 0, speed: 0.1 / 30 }
+        ];
 
-    const duration = 900   * 1000; // 30 seconds
-    const startTime = performance.now();
-
-    function drawGrid(t) {
-      const spacing = 40;
-      const waveAmplitude = 15 * Math.sin(t / 5000); // slow wave amplitude
-
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
-      ctx.lineWidth = 1;
-
-      for (let x = 0; x < width; x += spacing) {
-        ctx.beginPath();
-        for (let y = 0; y < height; y += 5) {
-          const offset = waveAmplitude * Math.sin((y / 100) - t / 200);
-          const newX = x + offset * Math.sin((x + t / 10) / 100);
-          if (y === 0) ctx.moveTo(newX, y);
-          else ctx.lineTo(newX, y);
+        // Stars background
+        const stars = [];
+        for (let i = 0; i < 200; i++) {
+            stars.push({
+                x: Math.random() * WIDTH,
+                y: Math.random() * HEIGHT,
+                size: Math.random() * 2 + 1
+            });
         }
-        ctx.stroke();
-      }
 
-      for (let y = 0; y < height; y += spacing) {
-        ctx.beginPath();
-        for (let x = 0; x < width; x += 5) {
-          const offset = waveAmplitude * Math.sin((x / 100) - t / 200);
-          const newY = y + offset * Math.sin((y + t / 10) / 100);
-          if (x === 0) ctx.moveTo(x, newY);
-          else ctx.lineTo(x, newY);
+        let startTime = null;
+        let lastTime = null;
+
+        function drawStars() {
+            ctx.fillStyle = 'white';
+            stars.forEach(star => {
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.size, 0, 2 * Math.PI);
+                ctx.fill();
+            });
         }
-        ctx.stroke();
-      }
-    }
 
-    function drawBlackHoles(t) {
-      const centerX = width / 2;
-      const centerY = height / 2;
-      const spiralRadius = 150 * Math.exp(-t / duration); // inspiral shrinking
-      const angle = t / 200;
+        function interpolateColor(color1, color2, factor) {
+            const r1 = parseInt(color1.slice(1, 3), 16);
+            const g1 = parseInt(color1.slice(3, 5), 16);
+            const b1 = parseInt(color1.slice(5, 7), 16);
+            const r2 = parseInt(color2.slice(1, 3), 16);
+            const g2 = parseInt(color2.slice(3, 5), 16);
+            const b2 = parseInt(color2.slice(5, 7), 16);
+            const r = Math.round(r1 + factor * (r2 - r1));
+            const g = Math.round(g1 + factor * (g2 - g1));
+            const b = Math.round(b1 + factor * (b2 - b1));
+            return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+        }
 
-      const x1 = centerX + spiralRadius * Math.cos(angle);
-      const y1 = centerY + spiralRadius * Math.sin(angle);
+        function animate(timestamp) {
+            if (!startTime) startTime = timestamp;
+            if (!lastTime) lastTime = timestamp;
 
-      const x2 = centerX - spiralRadius * Math.cos(angle);
-      const y2 = centerY - spiralRadius * Math.sin(angle);
+            const dt = (timestamp - lastTime) / 1000;
+            const t = (timestamp - startTime) / 1000;
 
-      // Ringdown fade to one
-      const blackHoleSize = 12 + 10 * Math.exp(-t / (duration / 3));
+            if (t > T_TOTAL) return;
 
-      ctx.beginPath();
-      ctx.fillStyle = "white";
-      ctx.arc(x1, y1, blackHoleSize, 0, 2 * Math.PI);
-      ctx.fill();
+            ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
-      ctx.beginPath();
-      ctx.arc(x2, y2, blackHoleSize, 0, 2 * Math.PI);
-      ctx.fill();
+            drawStars();
 
-      // Final merged black hole
-      if (t > duration * 0.7) {
-        ctx.beginPath();
-        ctx.fillStyle = `rgba(255,255,255,${(t - duration * 0.7) / (duration * 0.3)})`;
-        ctx.arc(centerX, centerY, blackHoleSize * 1.5, 0, 2 * Math.PI);
-        ctx.fill();
-      }
-    }
+            const phase = t / T_TOTAL;
+            let sunRadius = SUN_INITIAL_RADIUS;
+            let sunColor = '#FFFF00'; // Yellow
 
-    function animate(t) {
-      ctx.clearRect(0, 0, width, height);
-      drawGrid(t - startTime);
-      drawBlackHoles(t - startTime);
+            let stageText = 'Stable Main Sequence';
 
-      if (t - startTime < duration) {
+            if (phase > 0.333) {
+                // Expansion phase
+                const expFactor = (phase - 0.333) / 0.333;
+                sunRadius = SUN_INITIAL_RADIUS + expFactor * (SUN_MAX_RADIUS - SUN_INITIAL_RADIUS);
+                sunColor = interpolateColor('#FFFF00', '#FF0000', expFactor);
+                stageText = 'Red Giant Expansion';
+            }
+
+            if (phase > 0.666) {
+                // Contraction to white dwarf
+                const contFactor = (phase - 0.666) / 0.334;
+                sunRadius = SUN_MAX_RADIUS - contFactor * (SUN_MAX_RADIUS - SUN_WD_RADIUS);
+                sunColor = interpolateColor('#FF0000', '#FFFFFF', contFactor);
+                stageText = 'Planetary Nebula & White Dwarf';
+            }
+
+            // Draw Sun with glow
+            ctx.beginPath();
+            ctx.arc(CENTER_X, CENTER_Y, sunRadius, 0, 2 * Math.PI);
+            ctx.fillStyle = sunColor;
+            ctx.fill();
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = sunColor;
+            ctx.strokeStyle = sunColor;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            // Draw planets
+            planets.forEach(planet => {
+                planet.angle += planet.speed * dt * 20; // Speed up for visibility
+
+                const distPixels = planet.au * AU_SCALE; // Adjusted scaling
+                if (distPixels < sunRadius) return; // Engulfed
+
+                const x = CENTER_X + distPixels * Math.cos(planet.angle);
+                const y = CENTER_Y + distPixels * Math.sin(planet.angle);
+
+                ctx.beginPath();
+                ctx.arc(x, y, planet.size, 0, 2 * Math.PI);
+                ctx.fillStyle = planet.color;
+                ctx.fill();
+
+                // Label
+                ctx.fillStyle = 'white';
+                ctx.font = '10px Arial';
+                ctx.fillText(planet.name, x + planet.size + 2, y);
+            });
+
+            // Draw stage text
+            ctx.fillStyle = 'white';
+            ctx.font = '20px Arial';
+            ctx.fillText(stageText, 10, 30);
+            ctx.fillText(`Time: ${t.toFixed(1)}s / 30s`, 10, 60);
+
+            lastTime = timestamp;
+            requestAnimationFrame(animate);
+        }
+
         requestAnimationFrame(animate);
-      }
-    }
-
-    requestAnimationFrame(animate);
-  </script>
+    </script>
 </body>
 </html>
