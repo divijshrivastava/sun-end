@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gravitational Waves</title>
+  <style>
+    body {
+      margin: 0;
+      background: black;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gwCanvas"></canvas>
+  <script>
+    const canvas = document.getElementById("gwCanvas");
+    const ctx = canvas.getContext("2d");
+    let width, height;
+
+    function resize() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    const duration = 900   * 1000; // 30 seconds
+    const startTime = performance.now();
+
+    function drawGrid(t) {
+      const spacing = 40;
+      const waveAmplitude = 15 * Math.sin(t / 5000); // slow wave amplitude
+
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+      ctx.lineWidth = 1;
+
+      for (let x = 0; x < width; x += spacing) {
+        ctx.beginPath();
+        for (let y = 0; y < height; y += 5) {
+          const offset = waveAmplitude * Math.sin((y / 100) - t / 200);
+          const newX = x + offset * Math.sin((x + t / 10) / 100);
+          if (y === 0) ctx.moveTo(newX, y);
+          else ctx.lineTo(newX, y);
+        }
+        ctx.stroke();
+      }
+
+      for (let y = 0; y < height; y += spacing) {
+        ctx.beginPath();
+        for (let x = 0; x < width; x += 5) {
+          const offset = waveAmplitude * Math.sin((x / 100) - t / 200);
+          const newY = y + offset * Math.sin((y + t / 10) / 100);
+          if (x === 0) ctx.moveTo(x, newY);
+          else ctx.lineTo(x, newY);
+        }
+        ctx.stroke();
+      }
+    }
+
+    function drawBlackHoles(t) {
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const spiralRadius = 150 * Math.exp(-t / duration); // inspiral shrinking
+      const angle = t / 200;
+
+      const x1 = centerX + spiralRadius * Math.cos(angle);
+      const y1 = centerY + spiralRadius * Math.sin(angle);
+
+      const x2 = centerX - spiralRadius * Math.cos(angle);
+      const y2 = centerY - spiralRadius * Math.sin(angle);
+
+      // Ringdown fade to one
+      const blackHoleSize = 12 + 10 * Math.exp(-t / (duration / 3));
+
+      ctx.beginPath();
+      ctx.fillStyle = "white";
+      ctx.arc(x1, y1, blackHoleSize, 0, 2 * Math.PI);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(x2, y2, blackHoleSize, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Final merged black hole
+      if (t > duration * 0.7) {
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(255,255,255,${(t - duration * 0.7) / (duration * 0.3)})`;
+        ctx.arc(centerX, centerY, blackHoleSize * 1.5, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+    }
+
+    function animate(t) {
+      ctx.clearRect(0, 0, width, height);
+      drawGrid(t - startTime);
+      drawBlackHoles(t - startTime);
+
+      if (t - startTime < duration) {
+        requestAnimationFrame(animate);
+      }
+    }
+
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>
