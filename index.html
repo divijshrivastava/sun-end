@@ -36,14 +36,14 @@
         const SUN_WD_RADIUS = 2; // White dwarf, small
 
         const planets = [
-            { name: 'Mercury', au: 0.4, color: 'gray', size: 2, angle: 0, speed: 0.1 / 0.4 },
-            { name: 'Venus', au: 0.7, color: 'orange', size: 3, angle: 0, speed: 0.1 / 0.7 },
-            { name: 'Earth', au: 1, color: 'blue', size: 4, angle: 0, speed: 0.1 / 1 },
-            { name: 'Mars', au: 1.5, color: 'red', size: 3, angle: 0, speed: 0.1 / 1.5 },
-            { name: 'Jupiter', au: 5, color: 'brown', size: 10, angle: 0, speed: 0.1 / 5 },
-            { name: 'Saturn', au: 9.5, color: 'yellow', size: 9, angle: 0, speed: 0.1 / 9.5 },
-            { name: 'Uranus', au: 19, color: 'lightblue', size: 7, angle: 0, speed: 0.1 / 19 },
-            { name: 'Neptune', au: 30, color: 'darkblue', size: 7, angle: 0, speed: 0.1 / 30 }
+            { name: 'Mercury', au: 0.4, color: 'gray', size: 2, angle: 0, speed: 0.1 / 0.4, engulfed: false },
+            { name: 'Venus', au: 0.7, color: 'orange', size: 3, angle: 0, speed: 0.1 / 0.7, engulfed: false },
+            { name: 'Earth', au: 1, color: 'blue', size: 4, angle: 0, speed: 0.1 / 1, engulfed: false },
+            { name: 'Mars', au: 1.5, color: 'red', size: 3, angle: 0, speed: 0.1 / 1.5, engulfed: false },
+            { name: 'Jupiter', au: 5, color: 'brown', size: 10, angle: 0, speed: 0.1 / 5, engulfed: false },
+            { name: 'Saturn', au: 9.5, color: 'yellow', size: 9, angle: 0, speed: 0.1 / 9.5, engulfed: false },
+            { name: 'Uranus', au: 19, color: 'lightblue', size: 7, angle: 0, speed: 0.1 / 19, engulfed: false },
+            { name: 'Neptune', au: 30, color: 'darkblue', size: 7, angle: 0, speed: 0.1 / 30, engulfed: false }
         ];
 
         // Stars background
@@ -132,8 +132,13 @@
             planets.forEach(planet => {
                 planet.angle += planet.speed * dt * 20; // Speed up for visibility
 
-                const distPixels = planet.au * AU_SCALE; // Adjusted scaling
-                if (distPixels < sunRadius) return; // Engulfed
+                const distPixels = planet.au * AU_SCALE;
+                if (planet.engulfed || distPixels < sunRadius) {
+                    if (!planet.engulfed && distPixels < sunRadius) {
+                        planet.engulfed = true;
+                    }
+                    return; // Don't draw if engulfed or would be engulfed now
+                }
 
                 const x = CENTER_X + distPixels * Math.cos(planet.angle);
                 const y = CENTER_Y + distPixels * Math.sin(planet.angle);
