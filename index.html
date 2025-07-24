@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,9 +17,11 @@
             font-family: Arial, sans-serif;
             overflow: hidden;
         }
+
         canvas {
             border: 1px solid #333;
         }
+
         #credits {
             position: absolute;
             top: 100%;
@@ -26,19 +29,33 @@
             text-align: center;
             font-size: 24px;
             font-family: 'Courier New', monospace;
-            color: #ffd700; /* Gold color for Star Wars feel */
+            color: #ffd700;
+            /* Gold color for Star Wars feel */
             text-shadow: 0 0 10px #ffd700, 0 0 20px #ff4500;
             transform: perspective(300px) rotateX(30deg);
+            transition: top 60s linear;
             white-space: nowrap;
             z-index: 10;
         }
+
         .hidden {
             display: none;
         }
+
+        #zoomSlider {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            z-index: 5;
+        }
     </style>
 </head>
+
 <body>
     <canvas id="canvas" width="800" height="800"></canvas>
+    <input type="range" id="zoomSlider" min="0.1" max="5" step="0.1" value="1">
     <div id="credits" class="hidden">
         <p> </p>
         <p> </p>
@@ -101,6 +118,20 @@
         let startTime = null;
         let lastTime = null;
         let creditsStartTime = null;
+        let zoom = 1; // Initial zoom level
+
+        const zoomSlider = document.getElementById('zoomSlider');
+        zoomSlider.addEventListener('input', (e) => {
+            zoom = parseFloat(e.target.value);
+        });
+
+        // Add mouse wheel listener for zoom as fallback
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.1 : 0.1;
+            zoom = Math.max(0.1, Math.min(5, zoom + delta));
+            zoomSlider.value = zoom; // Sync slider
+        });
 
         function drawStars() {
             ctx.fillStyle = 'white';
@@ -162,66 +193,55 @@
                 stageText = 'Planetary Nebula & White Dwarf';
             }
 
+            // Apply zoom to the context for the solar system
+            ctx.save();
+            ctx.translate(CENTER_X, CENTER_Y);
+            ctx.scale(zoom, zoom);
+            ctx.translate(-CENTER_X, -CENTER_Y);
+
             // Draw Sun with glow
             ctx.beginPath();
             ctx.arc(CENTER_X, CENTER_Y, sunRadius, 0, 2 * Math.PI);
             ctx.fillStyle = sunColor;
             ctx.fill();
-            ctx.shadowBlur = 20;
+            ctx.shadowBlur = 20 / zoom; // Adjust shadow for zoom
             ctx.shadowColor = sunColor;
             ctx.strokeStyle = sunColor;
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 2 / zoom;
             ctx.stroke();
             ctx.shadowBlur = 0;
 
-            // Update and draw planets only during main animation
-            if (t <= T_TOTAL) {
-                planets.forEach(planet => {
-                    planet.angle += planet.speed * dt * 20; // Speed up for visibility
+            // Draw planets
+            planets.forEach(planet => {
+                if (t <= T_TOTAL) {
+                    planet.angle += planet.speed * dt * 20; // Update during main animation
+                }
 
-                    const distPixels = planet.au * AU_SCALE;
-                    if (planet.engulfed || distPixels < sunRadius) {
-                        if (!planet.engulfed && distPixels < sunRadius) {
-                            planet.engulfed = true;
-                        }
-                        return; // Don't draw if engulfed or would be engulfed now
+                const distPixels = planet.au * AU_SCALE;
+                if (planet.engulfed || distPixels < sunRadius) {
+                    if (!planet.engulfed && distPixels < sunRadius) {
+                        planet.engulfed = true;
                     }
+                    return; // Don't draw if engulfed
+                }
 
-                    const x = CENTER_X + distPixels * Math.cos(planet.angle);
-                    const y = CENTER_Y + distPixels * Math.sin(planet.angle);
+                const x = CENTER_X + distPixels * Math.cos(planet.angle);
+                const y = CENTER_Y + distPixels * Math.sin(planet.angle);
 
-                    ctx.beginPath();
-                    ctx.arc(x, y, planet.size, 0, 2 * Math.PI);
-                    ctx.fillStyle = planet.color;
-                    ctx.fill();
+                ctx.beginPath();
+                ctx.arc(x, y, planet.size, 0, 2 * Math.PI);
+                ctx.fillStyle = planet.color;
+                ctx.fill();
 
-                    // Label
-                    ctx.fillStyle = 'white';
-                    ctx.font = '10px Arial';
-                    ctx.fillText(planet.name, x + planet.size + 2, y);
-                });
-            } else {
-                // After 30s, draw remaining planets without updating angles
-                planets.forEach(planet => {
-                    if (planet.engulfed) return;
+                // Label (adjust font for zoom)
+                ctx.fillStyle = 'white';
+                ctx.font = `${10 / zoom}px Arial`;
+                ctx.fillText(planet.name, x + planet.size + 2 / zoom, y);
+            });
 
-                    const distPixels = planet.au * AU_SCALE;
-                    const x = CENTER_X + distPixels * Math.cos(planet.angle);
-                    const y = CENTER_Y + distPixels * Math.sin(planet.angle);
+            ctx.restore();
 
-                    ctx.beginPath();
-                    ctx.arc(x, y, planet.size, 0, 2 * Math.PI);
-                    ctx.fillStyle = planet.color;
-                    ctx.fill();
-
-                    // Label
-                    ctx.fillStyle = 'white';
-                    ctx.font = '10px Arial';
-                    ctx.fillText(planet.name, x + planet.size + 2, y);
-                });
-            }
-
-            // Draw stage text only during main animation
+            // Draw stage text (not scaled)
             if (t <= T_TOTAL) {
                 ctx.fillStyle = 'white';
                 ctx.font = '20px Arial';
@@ -233,10 +253,10 @@
             if (creditsStartTime) {
                 const creditsTime = (timestamp - creditsStartTime) / 1000;
                 const credits = document.getElementById('credits');
-                credits.style.top = `${100 - (creditsTime / 60) * 200}%`; // Adjusted scroll speed for longer scroll
+                credits.style.top = `${100 - (creditsTime / 60) * 200}%`; // Adjusted for full scroll
                 if (creditsTime > 60) {
                     credits.style.display = 'none';
-                    return; // Stop the animation after credits
+                    return; // Stop animation
                 }
             }
 
@@ -247,4 +267,5 @@
         requestAnimationFrame(animate);
     </script>
 </body>
+
 </html>
