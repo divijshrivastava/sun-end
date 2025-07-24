@@ -163,8 +163,15 @@
             const t = (timestamp - startTime) / 1000;
 
             if (t > T_TOTAL && !creditsStartTime) {
-                document.getElementById('credits').classList.remove('hidden');
+                const credits = document.getElementById('credits');
+                credits.classList.remove('hidden');
+                credits.style.top = '100%'; // Set initial explicitly
+                void credits.offsetHeight; // Force reflow
+                credits.style.top = '-200%'; // Trigger transition
                 creditsStartTime = timestamp;
+                setTimeout(() => {
+                    credits.style.display = 'none';
+                }, 60000);
             }
 
             ctx.clearRect(0, 0, WIDTH, HEIGHT);
@@ -213,9 +220,7 @@
 
             // Draw planets
             planets.forEach(planet => {
-                if (t <= T_TOTAL) {
-                    planet.angle += planet.speed * dt * 20; // Update during main animation
-                }
+                planet.angle += planet.speed * dt * 20; // Always update to keep revolving
 
                 const distPixels = planet.au * AU_SCALE;
                 if (planet.engulfed || distPixels < sunRadius) {
@@ -247,17 +252,6 @@
                 ctx.font = '20px Arial';
                 ctx.fillText(stageText, 10, 30);
                 ctx.fillText(`Time: ${t.toFixed(1)}s / 30s`, 10, 60);
-            }
-
-            // Handle credits scroll
-            if (creditsStartTime) {
-                const creditsTime = (timestamp - creditsStartTime) / 1000;
-                const credits = document.getElementById('credits');
-                credits.style.top = `${100 - (creditsTime / 60) * 200}%`; // Adjusted for full scroll
-                if (creditsTime > 60) {
-                    credits.style.display = 'none';
-                    return; // Stop animation
-                }
             }
 
             lastTime = timestamp;
